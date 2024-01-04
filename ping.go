@@ -3,6 +3,7 @@ package ping
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	mrand "math/rand"
 	"net"
 	"time"
@@ -51,6 +52,10 @@ func New(target string) (*Pinger, error) {
 		return nil, err
 	}
 
+	if len(addr.String()) == 0 {
+		return nil, errors.New("Failed to resolve target host")
+	}
+
 	p := &Pinger{
 		Host:     addr,
 		Interval: 1 * time.Second,
@@ -89,6 +94,10 @@ func (p *Pinger) Start() {
 		case <-ticker.C:
 			i++
 			p.sendPacket(i)
+			if i+1 > p.Count {
+				ticker.Stop()
+				return
+			}
 		}
 	}
 }
