@@ -1,4 +1,4 @@
-package go-ping
+package goping
 
 import (
 	"context"
