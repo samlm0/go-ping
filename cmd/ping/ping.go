@@ -46,7 +46,7 @@ func main() {
 	p.Interval = 1 * *interval
 	p.Timeout = 1 * *timeout
 	p.OnEvent = func(e *ping.PacketEvent, err error) {
-		if err != nil {
+		if e.IsTimeout {
 			fmt.Println("Request timeout for icmp_seq " + strconv.Itoa(e.Seq))
 			return
 		}
