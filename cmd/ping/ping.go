@@ -50,7 +50,7 @@ func main() {
 			fmt.Println("Request timeout for icmp_seq " + strconv.Itoa(e.Seq))
 			return
 		}
-		fmt.Printf("%d bytes from %s: icmp_seq=%d ttl=%v time=%.2f ms\n",
+		fmt.Printf("%d bytes from %s: icmp_seq=%d ttl=%v time=%.4f ms\n",
 			e.Size, e.From, e.Seq, e.TTL, float32(e.Latency.Microseconds())/1000)
 	}
 	fmt.Printf("PING %s (%s): %d data bytes\n", host, p.Host.IP, p.Size)
