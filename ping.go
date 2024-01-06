@@ -18,9 +18,9 @@ type Pinger struct {
 	Interval time.Duration
 	Timeout  time.Duration
 	Count    int
+	Size     int
 	id       uint16
-	Cancel   context.CancelFunc
-	OnEvent  func(*PacketEvent)
+	OnEvent  func(*PacketEvent, error)
 
 	statistic *PacketStatistic
 }
@@ -53,14 +53,15 @@ func New(target string) (*Pinger, error) {
 	}
 
 	if len(addr.String()) == 0 {
-		return nil, errors.New("Failed to resolve target host")
+		return nil, errors.New("failed to resolve target host")
 	}
 
 	p := &Pinger{
 		Host:     addr,
 		Interval: 1 * time.Second,
 		Timeout:  5 * time.Second,
-		Count:    10,
+		Count:    0,
+		Size:     56,
 		statistic: &PacketStatistic{
 			SendCount:     0,
 			ReceivedCount: 0,
@@ -77,14 +78,12 @@ func New(target string) (*Pinger, error) {
 	return p, nil
 }
 
-func (p *Pinger) Start() {
-	ctx, cancel := context.WithCancel(context.Background())
-	p.Cancel = cancel
+func (p *Pinger) Start(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
 	ticker := time.NewTicker(p.Interval)
 	i := 1
-	p.sendPacket(i)
+	p.sendPacket(i, cancel)
 
 	for {
 		select {
@@ -93,7 +92,11 @@ func (p *Pinger) Start() {
 			return
 		case <-ticker.C:
 			i++
-			p.sendPacket(i)
+			p.sendPacket(i, cancel)
+			if p.Count == 0 {
+				continue
+			}
+
 			if i+1 > p.Count {
 				ticker.Stop()
 				return
@@ -128,17 +131,17 @@ func (p *Pinger) updateStatistic(e *PacketEvent) {
 	p.statistic.TimeMdev = p.statistic.TimeMax - p.statistic.TimeMin
 }
 
-func (p *Pinger) sendPacket(seq int) {
+func (p *Pinger) sendPacket(seq int, cancel context.CancelFunc) {
 	isIPv4 := p.Host.IP.To4() != nil
 	// for better maintenance
 	if isIPv4 {
-		p.sendV4Packet(seq)
+		p.sendV4Packet(seq, cancel)
 	} else {
-		p.sendV6Packet(seq)
+		p.sendV6Packet(seq, cancel)
 	}
 }
 
-func (p *Pinger) sendV4Packet(seq int) {
+func (p *Pinger) sendV4Packet(seq int, cancel context.CancelFunc) {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		panic(err)
@@ -151,11 +154,12 @@ func (p *Pinger) sendV4Packet(seq int) {
 	conn.SetWriteDeadline(time.Now().Add(p.Timeout))
 	conn.SetReadDeadline(time.Now().Add(p.Timeout))
 
-	if seq > p.Count {
-		p.Cancel()
+	if seq > p.Count && p.Count != 0 {
+		cancel()
 		return
 	}
-	body := make([]byte, 56)
+
+	body := make([]byte, p.Size)
 
 	_, _ = rand.Read(body)
 
@@ -176,7 +180,7 @@ func (p *Pinger) sendV4Packet(seq int) {
 	length, err := conn.WriteTo(data, p.Host)
 	if err != nil {
 		if p.OnEvent != nil {
-			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true})
+			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true}, err)
 		}
 		p.updateStatistic(&PacketEvent{Seq: seq, IsTimeout: true})
 		return
@@ -192,7 +196,7 @@ func (p *Pinger) sendV4Packet(seq int) {
 	timeB := time.Now()
 	if err == nil && addr.String() != p.Host.String() {
 		if p.OnEvent != nil {
-			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true})
+			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true}, err)
 		}
 		p.updateStatistic(&PacketEvent{Seq: seq, IsTimeout: true})
 		return
@@ -216,12 +220,12 @@ func (p *Pinger) sendV4Packet(seq int) {
 	}
 
 	if p.OnEvent != nil {
-		p.OnEvent(event)
+		p.OnEvent(event, nil)
 	}
 	p.updateStatistic(event)
 }
 
-func (p *Pinger) sendV6Packet(seq int) {
+func (p *Pinger) sendV6Packet(seq int, cancel context.CancelFunc) {
 	conn, err := icmp.ListenPacket("ip6:ipv6-icmp", "::")
 	if err != nil {
 		panic(err)
@@ -233,11 +237,13 @@ func (p *Pinger) sendV6Packet(seq int) {
 	conn.SetWriteDeadline(time.Now().Add(p.Timeout))
 	conn.SetReadDeadline(time.Now().Add(p.Timeout))
 
-	if seq > p.Count {
-		p.Cancel()
+	if seq > p.Count && p.Count != 0 {
+		cancel()
 		return
 	}
-	body := make([]byte, 56)
+
+	body := make([]byte, p.Size)
+
 	_, _ = rand.Read(body)
 	packet := &icmp.Message{
 		Type: ipv6.ICMPTypeEchoRequest,
@@ -253,7 +259,7 @@ func (p *Pinger) sendV6Packet(seq int) {
 	length, err := conn.WriteTo(data, p.Host)
 	if err != nil {
 		if p.OnEvent != nil {
-			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true})
+			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true}, err)
 		}
 		p.updateStatistic(&PacketEvent{Seq: seq, IsTimeout: true})
 		return
@@ -267,7 +273,7 @@ func (p *Pinger) sendV6Packet(seq int) {
 	timeB := time.Now()
 	if err == nil && addr.String() != p.Host.String() {
 		if p.OnEvent != nil {
-			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true})
+			p.OnEvent(&PacketEvent{Seq: seq, IsTimeout: true}, err)
 		}
 		p.updateStatistic(&PacketEvent{Seq: seq, IsTimeout: true})
 		return
@@ -291,7 +297,7 @@ func (p *Pinger) sendV6Packet(seq int) {
 	}
 
 	if p.OnEvent != nil {
-		p.OnEvent(event)
+		p.OnEvent(event, nil)
 	}
 	p.updateStatistic(event)
 }
