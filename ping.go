@@ -36,9 +36,9 @@ type PacketEvent struct {
 }
 
 type PacketStatistic struct {
-	SendCount     int           `json:"count.send_count"`
-	ReceivedCount int           `json:"count.received_count"`
-	LossedCount   int           `json:"count.lossed_count"`
+	SendCount     int           `json:"send_count"`
+	ReceivedCount int           `json:"received_count"`
+	LossedCount   int           `json:"lossed_count"`
 	TimeTotal     time.Duration `json:"time_total"`
 	TimeMax       time.Duration `json:"time_max"`
 	TimeMin       time.Duration `json:"time_min"`
