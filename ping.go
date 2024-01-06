@@ -36,14 +36,14 @@ type PacketEvent struct {
 }
 
 type PacketStatistic struct {
-	SendCount     int
-	ReceivedCount int
-	LossedCount   int
-	TimeTotal     time.Duration
-	TimeMax       time.Duration
-	TimeMin       time.Duration
-	TimeAvg       time.Duration
-	TimeMdev      time.Duration
+	SendCount     int           `json:"count.send_count"`
+	ReceivedCount int           `json:"count.received_count"`
+	LossedCount   int           `json:"count.lossed_count"`
+	TimeTotal     time.Duration `json:"time_total"`
+	TimeMax       time.Duration `json:"time_max"`
+	TimeMin       time.Duration `json:"time_min"`
+	TimeAvg       time.Duration `json:"time_avg"`
+	TimeMdev      time.Duration `json:"time_mdev"`
 }
 
 func New(target string) (*Pinger, error) {
