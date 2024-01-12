@@ -26,13 +26,13 @@ type Pinger struct {
 }
 
 type PacketEvent struct {
-	IsTimeout bool
-	From      string
-	Seq       int
-	Size      int
-	TTL       int
-	Latency   time.Duration
-	Message   *icmp.Message
+	IsTimeout bool          `json:"is_timeout"`
+	From      string        `json:"from"`
+	Seq       int           `json:"seq"`
+	Size      int           `json:"size"`
+	TTL       int           `json:"ttl"`
+	Latency   time.Duration `json:"latency"`
+	Message   *icmp.Message `json:"-"`
 }
 
 type PacketStatistic struct {
